@@ -158,7 +158,7 @@ col_logo, col_title = st.columns([1, 15])
 with col_logo:
     st.markdown("<h1 style='text-align: left;'>⚡</h1>", unsafe_allow_html=True)
 with col_title:
-    st.title("Sports AI & Predictive Analytics")
+    st.title("Analisando Dados no Futebol e Eficiência das Odds")
     st.markdown("Painel de inteligência quantitativa para análise tática, estatística e de valor esperado (EV).")
 
 # =====================================================================
