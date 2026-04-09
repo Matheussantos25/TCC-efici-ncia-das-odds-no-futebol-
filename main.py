@@ -9,6 +9,7 @@ import os
 import joblib
 import plotly.express as px
 import plotly.graph_objects as go
+# from plotly.subplots import make_subplots # <-- REMOVIDO: Não precisamos mais de subplots
 from sklearn.preprocessing import RobustScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
@@ -50,34 +51,12 @@ st.markdown("""
         border-radius: 6px !important;
     }
     
-    /* Ajuste para os textos dos inputs (Número de apostas, Quantidade de usuários, etc) */
     label[data-testid="stWidgetLabel"] p {
         color: #ffffff !important;
         font-size: 16px !important;
         font-weight: 600 !important;
     }
 
-    /* Ajuste para os botões (como o Iniciar Simulação) */
-    div[data-testid="stButton"] > button {
-        background-color: #3498db !important;
-        color: #ffffff !important;
-        border: 1px solid #2980b9 !important;
-        font-weight: bold !important;
-    }
-    div[data-testid="stButton"] > button p {
-        color: #ffffff !important;
-        font-size: 16px !important;
-    }
-    div[data-testid="stButton"] > button:hover {
-        background-color: #2980b9 !important;
-        border-color: #ffffff !important;
-    }
-
-    span[data-baseweb="tag"] {
-        background-color: #3498db !important;
-        color: #ffffff !important;
-        border: none !important;
-    }
     div[data-baseweb="popover"] > div, 
     div[data-baseweb="popover"] ul,
     ul[role="listbox"],
@@ -271,9 +250,6 @@ def treinar_e_avaliar_modelo(df_base, liga_nome):
 
     df_features['Alvo_Vitoria'] = (df_features['Gols_Mandante'] > df_features['Gols_Visitante']).astype(int)
 
-    # =========================================================
-    # SELEÇÃO DINÂMICA DO ARQUIVO PKL (E ASSEGURAR CARREGAMENTO)
-    # =========================================================
     if liga_nome == "Premier League":
         arquivo_pkl = "melhor_modelo_pipeline_premier.pkl"
     else:
@@ -292,7 +268,6 @@ def treinar_e_avaliar_modelo(df_base, liga_nome):
 
     cols_essenciais = colunas_treino + ['Odd_Mandante', 'Alvo_Vitoria', 'Mandante', 'Visitante', 'Data_Hora']
 
-    # REPLICAÇÃO EXATA DO CORTE DE DADOS DO CÓDIGO PADRÃO:
     df_modelo = df_features.dropna(subset=cols_essenciais).copy()
     df_modelo = df_modelo[df_modelo['Odd_Mandante'] > 1.01]
     df_modelo = df_modelo.sort_values(by='Data_Hora').reset_index(drop=True)
@@ -308,9 +283,6 @@ def treinar_e_avaliar_modelo(df_base, liga_nome):
     X_val, y_val = X.iloc[idx_treino:idx_val], y.iloc[idx_treino:idx_val]
     X_teste, y_teste = X.iloc[idx_val:], y.iloc[idx_val:]
 
-    # =========================================================
-    # APLICAÇÃO DO WALK-FORWARD NO TESTE (EXATAMENTE COMO O BASE)
-    # =========================================================
     X_hist_atual = pd.concat([X_treino, X_val]).copy()
     y_hist_atual = pd.concat([y_treino, y_val]).copy()
 
@@ -334,7 +306,6 @@ def treinar_e_avaliar_modelo(df_base, liga_nome):
 
     probs_teste = np.array(probs_teste_wf)
 
-    # DataFrame de avaliação do teste
     df_teste = df_modelo.iloc[idx_val:].copy()
     df_teste['Prob_Modelo'] = probs_teste
     df_teste['Odd_Justa_Modelo'] = 1 / df_teste['Prob_Modelo']
@@ -344,15 +315,12 @@ def treinar_e_avaliar_modelo(df_base, liga_nome):
     df_apostas['Resultado_Aposta'] = np.where(df_apostas['Alvo_Vitoria'] == 1, df_apostas['Odd_Mandante'] - 1, -1)
     df_apostas['Lucro_Acumulado'] = df_apostas['Resultado_Aposta'].cumsum()
 
-    # =========================================================
-    # JOGOS FUTUROS (SEM RESULTADO)
-    # =========================================================
     df_futuro = df_features[df_features['Gols_Mandante'].isna()].copy()
     df_futuro_final = pd.DataFrame()
     if not df_futuro.empty:
         df_futuro = df_futuro.dropna(subset=colunas_treino)
         if not df_futuro.empty:
-            modelo_producao.fit(X_hist_atual, y_hist_atual) # Treina com todo o histórico acumulado
+            modelo_producao.fit(X_hist_atual, y_hist_atual)
             probs_fut = modelo_producao.predict_proba(df_futuro[colunas_treino])[:, 1]
             df_futuro['Prob_Modelo_Num'] = probs_fut
             df_futuro['Odd_Justa'] = 1 / df_futuro['Prob_Modelo_Num']
@@ -447,9 +415,16 @@ with st.sidebar:
         st.markdown(f"<div style='text-align: right; color: {COR_VIS}; font-size: 0.85em;'>Probabilidade Implícita: <b>{prob_v_min:.1f}% a {prob_v_max:.1f}%</b></div>", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
-# ABAS PRINCIPAIS
+# ABAS PRINCIPAIS (AGORA COM 6 ABAS)
 # ---------------------------------------------------------------------
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Estatísticas e Tática", "🤖 Inteligência (Brasileirão)", "🤖 Inteligência (Premier League)", "🎲 Simulador de Apostas", "⚖️ Eficiência das Odds"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "📊 Estatísticas e Tática", 
+    "🤖 Inteligência (Brasileirão)", 
+    "🤖 Inteligência (Premier League)", 
+    "🎲 Simulador de Apostas", 
+    "⚖️ Eficiência das Odds",
+    "⚔️ Raio-X do Confronto"
+])
 
 # ---------------------------------------------------------------------
 # TAB 1: ESTATÍSTICAS E GRÁFICOS
@@ -628,13 +603,39 @@ with tab1:
             st.plotly_chart(fig_res, use_container_width=True)
             
         with colD:
+            # =========================================================
+            # AJUSTE: GRÁFICO DE CLIMA SIMPLIFICADO (APENAS TEMPERATURA)
+            # =========================================================
             st.markdown("#### 🌤️ Impacto Climático Histórico")
             clima = df_subset.groupby("Temporada")[["Temperatura_C", "Umidade_Relativa_%"]].mean().reset_index()
+            
+            # Criando gráfico simples sem eixos secundários
             fig_clima = go.Figure()
-            hex_to_rgb = lambda hex_val: f"{int(hex_val[1:3], 16)}, {int(hex_val[3:5], 16)}, {int(hex_val[5:7], 16)}"
-            fig_clima.add_trace(go.Scatter(x=clima["Temporada"], y=clima["Temperatura_C"], mode='lines', name='Temp (°C)', stackgroup='one', fillcolor=f'rgba({hex_to_rgb(COR_VIS)}, 0.3)', line=dict(color=COR_VIS)))
-            fig_clima.add_trace(go.Scatter(x=clima["Temporada"], y=clima["Umidade_Relativa_%"], mode='lines', name='Umid (%)', stackgroup='two', fillcolor=f'rgba({hex_to_rgb(COR_MAN)}, 0.3)', line=dict(color=COR_MAN)))
-            fig_clima.update_layout(template="plotly_dark", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', margin=dict(l=0, r=0, t=30, b=0), hovermode="x unified")
+            
+            # Adicionando apenas a linha de Temperatura
+            fig_clima.add_trace(
+                go.Scatter(
+                    x=clima["Temporada"], 
+                    y=clima["Temperatura_C"], 
+                    mode='lines+markers', 
+                    name='Temp (°C)', 
+                    line=dict(color=COR_VIS, width=3) # Usando a cor de Fora/Atenção para Temp
+                )
+            )
+            
+            # Configurando o Layout simples
+            fig_clima.update_layout(
+                template="plotly_dark", 
+                plot_bgcolor='rgba(0,0,0,0)', 
+                paper_bgcolor='rgba(0,0,0,0)', 
+                margin=dict(l=0, r=0, t=30, b=0), 
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="right", x=1)
+            )
+            
+            # Ajustando o eixo Y único para Temperatura
+            fig_clima.update_yaxes(title_text="Temperatura (°C)", showgrid=False, color=COR_VIS)
+            
             st.plotly_chart(fig_clima, use_container_width=True)
 
 # ---------------------------------------------------------------------
@@ -1022,3 +1023,70 @@ with tab5:
 
     render_eficiencia_linha(liga_escolhida_1, col_liga1)
     render_eficiencia_linha(liga_escolhida_2, col_liga2)
+
+# ---------------------------------------------------------------------
+# TAB 6: RAIO-X DO CONFRONTO (H2H)
+# ---------------------------------------------------------------------
+with tab6:
+    st.header("⚔️ Raio-X do Confronto (Matchup)")
+    st.markdown("Compare o momento exato de duas equipes antes de um confronto, usando apenas o histórico até a data selecionada.")
+
+    times_totais = sorted(list(set(df_geral["Mandante"].dropna().unique()) | set(df_geral["Visitante"].dropna().unique())))
+    
+    col_x, col_y, col_data = st.columns(3)
+    with col_x:
+        time_casa = st.selectbox("🏠 Selecione o Mandante (Casa):", times_totais, index=0)
+    with col_y:
+        time_fora = st.selectbox("✈️ Selecione o Visitante (Fora):", times_totais, index=1 if len(times_totais)>1 else 0)
+    with col_data:
+        data_maxima = df_geral['Data_Hora'].max() if not df_geral.empty else pd.to_datetime('today')
+        data_referencia = st.date_input("📅 Data de Referência (Momento):", value=data_maxima)
+
+    st.markdown("---")
+    
+    # Filtro para evitar data leakage
+    df_passado = df_geral[df_geral['Data_Hora'].dt.date <= data_referencia].copy()
+    
+    # Últimos 5 jogos
+    jogos_casa = df_passado[(df_passado['Mandante'] == time_casa) | (df_passado['Visitante'] == time_casa)].sort_values(by='Data_Hora').tail(5)
+    jogos_fora = df_passado[(df_passado['Mandante'] == time_fora) | (df_passado['Visitante'] == time_fora)].sort_values(by='Data_Hora').tail(5)
+
+    if jogos_casa.empty or jogos_fora.empty:
+        st.warning("Não há histórico suficiente para essas equipes antes da data selecionada.")
+    else:
+        def calcular_form(df_jogos, time):
+            form = []
+            gols_feitos, gols_sofridos = 0, 0
+            for _, row in df_jogos.iterrows():
+                if row['Mandante'] == time:
+                    gf, gs = row['Gols_Mandante'], row['Gols_Visitante']
+                else:
+                    gf, gs = row['Gols_Visitante'], row['Gols_Mandante']
+                
+                gols_feitos += gf
+                gols_sofridos += gs
+                
+                if gf > gs: form.append("V")
+                elif gf == gs: form.append("E")
+                else: form.append("D")
+            return "".join(form), gols_feitos / len(df_jogos), gols_sofridos / len(df_jogos)
+
+        form_c, gf_c, gs_c = calcular_form(jogos_casa, time_casa)
+        form_f, gf_f, gs_f = calcular_form(jogos_fora, time_fora)
+
+        col_c_stats, col_vs, col_f_stats = st.columns([2, 1, 2])
+        
+        with col_c_stats:
+            st.markdown(f"<h3 style='text-align: center; color: {COR_MAN};'>{time_casa}</h3>", unsafe_allow_html=True)
+            st.metric("Últimos 5 Jogos", form_c)
+            st.metric("Média de Gols Pró (Recente)", f"{gf_c:.1f}")
+            st.metric("Média de Gols Sofridos (Recente)", f"{gs_c:.1f}")
+
+        with col_vs:
+            st.markdown("<h1 style='text-align: center; margin-top: 50px;'>VS</h1>", unsafe_allow_html=True)
+
+        with col_f_stats:
+            st.markdown(f"<h3 style='text-align: center; color: {COR_VIS};'>{time_fora}</h3>", unsafe_allow_html=True)
+            st.metric("Últimos 5 Jogos", form_f)
+            st.metric("Média de Gols Pró (Recente)", f"{gf_f:.1f}")
+            st.metric("Média de Gols Sofridos (Recente)", f"{gs_f:.1f}")
